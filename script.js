@@ -58,6 +58,11 @@ function handleImageUpload(event) {
             canvas.height = img.height;
             maskCanvas.width = img.width;
             maskCanvas.height = img.height;
+            // Adjust canvas display size for responsiveness
+            canvas.style.width = '100%';
+            canvas.style.height = 'auto';
+            maskCanvas.style.width = '100%';
+            maskCanvas.style.height = 'auto';
             // Clear previous drawings
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
@@ -77,76 +82,169 @@ function handleImageUpload(event) {
     reader.readAsDataURL(file);
 }
 
-// Drawing event listeners
+// Drawing event listeners for mouse
 maskCanvas.addEventListener('mousedown', startDrawing);
 maskCanvas.addEventListener('mouseup', stopDrawing);
 maskCanvas.addEventListener('mouseleave', stopDrawing);
 maskCanvas.addEventListener('mousemove', draw);
 
-// Drawing functions
-function startDrawing(e) {
-    if (maskCanvas.classList.contains('hidden')) return;
+// Drawing event listeners for touch
+maskCanvas.addEventListener('touchstart', startDrawingTouch, { passive: false });
+maskCanvas.addEventListener('touchmove', drawTouch, { passive: false });
+maskCanvas.addEventListener('touchend', stopDrawingTouch, { passive: false });
+maskCanvas.addEventListener('touchcancel', stopDrawingTouch, { passive: false });
+
+// Helper function to get mouse or touch position
+function getPointerPos(e) {
+    const rect = maskCanvas.getBoundingClientRect();
+    if (e.touches && e.touches.length > 0) {
+        return {
+            x: (e.touches[0].clientX - rect.left) * (maskCanvas.width / rect.width),
+            y: (e.touches[0].clientY - rect.top) * (maskCanvas.height / rect.height)
+        };
+    } else {
+        return {
+            x: (e.clientX - rect.left) * (maskCanvas.width / rect.width),
+            y: (e.clientY - rect.top) * (maskCanvas.height / rect.height)
+        };
+    }
+}
+
+// Touch event handlers
+function startDrawingTouch(e) {
+    e.preventDefault();
+    const pos = getPointerPos(e);
+    startX = pos.x;
+    startY = pos.y;
     drawing = true;
-    startX = e.offsetX;
-    startY = e.offsetY;
     if (toolMode === 'rectMask') {
         currentX = startX;
         currentY = startY;
     } else {
-        // Set composite operation based on tool mode
-        if (toolMode === 'mask') {
-            maskCtx.globalCompositeOperation = 'source-over';
-            maskCtx.strokeStyle = 'rgba(255, 0, 0, 1)'; // Red for mask
-        } else if (toolMode === 'unmask') {
-            maskCtx.globalCompositeOperation = 'destination-out';
-            maskCtx.strokeStyle = 'rgba(0, 0, 0, 1)'; // Color doesn't matter when erasing
-        }
-        maskCtx.lineWidth = document.getElementById('toolSize').value;
-        maskCtx.lineCap = 'round';
-        draw(e); // Start drawing immediately for mask/unmask tools
+        setToolSettings();
+        drawTouchMove(pos.x, pos.y);
+    }
+}
+
+function drawTouch(e) {
+    e.preventDefault();
+    if (!drawing) return;
+    const pos = getPointerPos(e);
+    if (toolMode === 'rectMask') {
+        currentX = pos.x;
+        currentY = pos.y;
+        drawDottedRect();
+    } else {
+        drawTouchMove(pos.x, pos.y);
+    }
+}
+
+function stopDrawingTouch(e) {
+    e.preventDefault();
+    if (!drawing) return;
+    drawing = false;
+    if (toolMode === 'rectMask') {
+        const pos = getPointerPos(e);
+        const rectWidth = pos.x - startX;
+        const rectHeight = pos.y - startY;
+        applyRectMask(startX, startY, rectWidth, rectHeight);
+    } else {
+        saveHistory();
+        maskCtx.globalCompositeOperation = 'source-over';
+    }
+}
+
+// Mouse event handlers
+function startDrawing(e) {
+    if (maskCanvas.classList.contains('hidden')) return;
+    const pos = getPointerPos(e);
+    startX = pos.x;
+    startY = pos.y;
+    drawing = true;
+    if (toolMode === 'rectMask') {
+        currentX = startX;
+        currentY = startY;
+    } else {
+        setToolSettings();
+        drawMove(pos.x, pos.y);
     }
 }
 
 function stopDrawing(e) {
     if (!drawing) return;
     drawing = false;
+    const pos = getPointerPos(e);
     if (toolMode === 'rectMask') {
-        // Set composite operation for rectMask
-        maskCtx.globalCompositeOperation = 'source-over';
-        maskCtx.fillStyle = 'rgba(255, 0, 0, 1)'; // Fully opaque red
-        const rectWidth = e.offsetX - startX;
-        const rectHeight = e.offsetY - startY;
-        maskCtx.fillRect(startX, startY, rectWidth, rectHeight);
-        saveHistory();
-        // Reset composite operation
-        maskCtx.globalCompositeOperation = 'source-over';
+        const rectWidth = pos.x - startX;
+        const rectHeight = pos.y - startY;
+        applyRectMask(startX, startY, rectWidth, rectHeight);
     } else {
         saveHistory();
-        // Reset composite operation
         maskCtx.globalCompositeOperation = 'source-over';
     }
 }
 
 function draw(e) {
     if (!drawing) return;
+    const pos = getPointerPos(e);
     if (toolMode === 'rectMask') {
-        currentX = e.offsetX;
-        currentY = e.offsetY;
+        currentX = pos.x;
+        currentY = pos.y;
         drawDottedRect();
     } else {
-        maskCtx.beginPath();
-        maskCtx.moveTo(startX, startY);
-        maskCtx.lineTo(e.offsetX, e.offsetY);
-        maskCtx.stroke();
-        maskCtx.closePath();
-
-        startX = e.offsetX;
-        startY = e.offsetY;
+        drawMove(pos.x, pos.y);
     }
 }
 
+// Drawing functions for mouse
+function drawMove(x, y) {
+    maskCtx.beginPath();
+    maskCtx.moveTo(startX, startY);
+    maskCtx.lineTo(x, y);
+    maskCtx.stroke();
+    maskCtx.closePath();
+
+    startX = x;
+    startY = y;
+}
+
+// Drawing functions for touch
+function drawTouchMove(x, y) {
+    maskCtx.beginPath();
+    maskCtx.moveTo(startX, startY);
+    maskCtx.lineTo(x, y);
+    maskCtx.stroke();
+    maskCtx.closePath();
+
+    startX = x;
+    startY = y;
+}
+
+// Set tool settings based on current mode
+function setToolSettings() {
+    if (toolMode === 'mask') {
+        maskCtx.globalCompositeOperation = 'source-over';
+        maskCtx.strokeStyle = 'rgba(255, 0, 0, 1)'; // Red for mask
+    } else if (toolMode === 'unmask') {
+        maskCtx.globalCompositeOperation = 'destination-out';
+        maskCtx.strokeStyle = 'rgba(0, 0, 0, 1)'; // Color doesn't matter when erasing
+    }
+    maskCtx.lineWidth = document.getElementById('toolSize').value;
+    maskCtx.lineCap = 'round';
+}
+
+// Apply rectangular mask
+function applyRectMask(x, y, width, height) {
+    maskCtx.globalCompositeOperation = 'source-over';
+    maskCtx.fillStyle = 'rgba(255, 0, 0, 1)'; // Fully opaque red
+    maskCtx.fillRect(x, y, width, height);
+    saveHistory();
+    maskCtx.globalCompositeOperation = 'source-over';
+}
+
+// Draw dotted rectangle for visual feedback
 function drawDottedRect() {
-    // To provide a visual guide without altering the mask
+    // Clear and redraw the mask to prevent permanent changes
     maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
     restoreHistory();
     maskCtx.setLineDash([5, 3]);
