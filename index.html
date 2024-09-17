@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Masking Tool</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <h1>Image Masking Tool</h1>
+    </header>
+
+    <main>
+        <div class="controls">
+            <div class="file-input-wrapper">
+                <input type="file" id="imageUpload" accept="image/*">
+                <i class="fas fa-cloud-upload-alt"></i> Choose an Image
+            </div>
+            <div class="slider-container">
+                <label for="toolSize">Tool Size:</label>
+                <input type="range" id="toolSize" min="1" max="100" value="10">
+                <span id="toolSizeValue">10</span>
+            </div>
+        </div>
+
+        <div class="content-wrapper">
+            <div id="dropContainer" class="container">
+                <div id="dropArea" class="drop-area">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <p>Drop image here or click to upload</p>
+                </div>
+                <canvas id="canvas"></canvas>
+                <canvas id="maskCanvas" class="hidden"></canvas>
+            </div>
+
+            <div class="toolbar">
+                <button id="maskTool" class="tool-button active" title="Mask">
+                    <i class="fas fa-brush"></i>
+                </button>
+                <button id="unmaskTool" class="tool-button" title="Unmask">
+                    <i class="fas fa-eraser"></i>
+                </button>
+                <button id="undo" class="tool-button" title="Undo">
+                    <i class="fas fa-undo"></i>
+                </button>
+                <button id="redo" class="tool-button" title="Redo">
+                    <i class="fas fa-redo"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="exportMask"><i class="fas fa-download"></i> Export Mask</button>
+            <button id="clearMask"><i class="fas fa-trash-alt"></i> Clear Mask</button>
+        </div>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
