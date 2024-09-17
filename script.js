@@ -6,6 +6,7 @@ const maskCtx = maskCanvas.getContext('2d');
 const toolSizeValue = document.getElementById('toolSizeValue');
 const maskToolBtn = document.getElementById('maskTool');
 const unmaskToolBtn = document.getElementById('unmaskTool');
+const rectMaskToolBtn = document.getElementById('rectMaskTool');
 const dropArea = document.getElementById('dropArea');
 const imageUpload = document.getElementById('imageUpload');
 
@@ -14,6 +15,7 @@ let drawing = false;
 let toolMode = 'mask';
 let history = [];
 let historyIndex = -1;
+let startX, startY, currentX, currentY;
 
 // Event listeners
 imageUpload.addEventListener('change', handleImageUpload);
@@ -22,8 +24,20 @@ document.getElementById('clearMask').addEventListener('click', clearMask);
 document.getElementById('toolSize').addEventListener('input', updateToolSize);
 maskToolBtn.addEventListener('click', () => setToolMode('mask'));
 unmaskToolBtn.addEventListener('click', () => setToolMode('unmask'));
+rectMaskToolBtn.addEventListener('click', () => setToolMode('rectMask'));
 document.getElementById('undo').addEventListener('click', undo);
 document.getElementById('redo').addEventListener('click', redo);
+
+// Add keyboard shortcuts for undo (Ctrl+Z) and redo (Ctrl+Y)
+document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.key === 'z') {
+        e.preventDefault();
+        undo();
+    } else if (e.ctrlKey && e.key === 'y') {
+        e.preventDefault();
+        redo();
+    }
+});
 
 // Initialize tool size display
 toolSizeValue.textContent = document.getElementById('toolSize').value;
@@ -73,37 +87,72 @@ maskCanvas.addEventListener('mousemove', draw);
 function startDrawing(e) {
     if (maskCanvas.classList.contains('hidden')) return;
     drawing = true;
-    draw(e); // Draw or erase immediately on mousedown
-}
-
-function stopDrawing() {
-    if (drawing) {
-        drawing = false;
-        saveHistory();
-    }
-}
-
-function draw(event) {
-    if (!drawing) return;
-    
-    const rect = maskCanvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    const toolSize = parseInt(document.getElementById('toolSize').value, 10);
-    
-    if (toolMode === 'unmask') {
-        maskCtx.save();
-        maskCtx.globalCompositeOperation = 'destination-out';
-        maskCtx.beginPath();
-        maskCtx.arc(x, y, toolSize / 2, 0, Math.PI * 2);
-        maskCtx.fill();
-        maskCtx.restore();
+    startX = e.offsetX;
+    startY = e.offsetY;
+    if (toolMode === 'rectMask') {
+        currentX = startX;
+        currentY = startY;
     } else {
-        maskCtx.fillStyle = 'rgba(255, 0, 0, 1)'; // Fully opaque red
-        maskCtx.beginPath();
-        maskCtx.arc(x, y, toolSize / 2, 0, Math.PI * 2);
-        maskCtx.fill();
+        // Set composite operation based on tool mode
+        if (toolMode === 'mask') {
+            maskCtx.globalCompositeOperation = 'source-over';
+            maskCtx.strokeStyle = 'rgba(255, 0, 0, 1)'; // Red for mask
+        } else if (toolMode === 'unmask') {
+            maskCtx.globalCompositeOperation = 'destination-out';
+            maskCtx.strokeStyle = 'rgba(0, 0, 0, 1)'; // Color doesn't matter when erasing
+        }
+        maskCtx.lineWidth = document.getElementById('toolSize').value;
+        maskCtx.lineCap = 'round';
+        draw(e); // Start drawing immediately for mask/unmask tools
     }
+}
+
+function stopDrawing(e) {
+    if (!drawing) return;
+    drawing = false;
+    if (toolMode === 'rectMask') {
+        // Set composite operation for rectMask
+        maskCtx.globalCompositeOperation = 'source-over';
+        maskCtx.fillStyle = 'rgba(255, 0, 0, 1)'; // Fully opaque red
+        const rectWidth = e.offsetX - startX;
+        const rectHeight = e.offsetY - startY;
+        maskCtx.fillRect(startX, startY, rectWidth, rectHeight);
+        saveHistory();
+        // Reset composite operation
+        maskCtx.globalCompositeOperation = 'source-over';
+    } else {
+        saveHistory();
+        // Reset composite operation
+        maskCtx.globalCompositeOperation = 'source-over';
+    }
+}
+
+function draw(e) {
+    if (!drawing) return;
+    if (toolMode === 'rectMask') {
+        currentX = e.offsetX;
+        currentY = e.offsetY;
+        drawDottedRect();
+    } else {
+        maskCtx.beginPath();
+        maskCtx.moveTo(startX, startY);
+        maskCtx.lineTo(e.offsetX, e.offsetY);
+        maskCtx.stroke();
+        maskCtx.closePath();
+
+        startX = e.offsetX;
+        startY = e.offsetY;
+    }
+}
+
+function drawDottedRect() {
+    // To provide a visual guide without altering the mask
+    maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+    restoreHistory();
+    maskCtx.setLineDash([5, 3]);
+    maskCtx.strokeStyle = 'rgba(255, 0, 0, 1)'; // Red for rect mask
+    maskCtx.strokeRect(startX, startY, currentX - startX, currentY - startY);
+    maskCtx.setLineDash([]);
 }
 
 // Export mask function
@@ -113,7 +162,7 @@ function exportMask() {
         return;
     }
     const link = document.createElement('a');
-    link.href = maskCanvas.toDataURL();
+    link.href = maskCanvas.toDataURL('image/png');
     link.download = 'mask.png';
     link.click();
 }
@@ -133,11 +182,12 @@ function updateToolSize(event) {
     toolSizeValue.textContent = event.target.value;
 }
 
-// Set tool mode (mask/unmask)
+// Set tool mode (mask/unmask/rectMask)
 function setToolMode(mode) {
     toolMode = mode;
     maskToolBtn.classList.toggle('active', mode === 'mask');
     unmaskToolBtn.classList.toggle('active', mode === 'unmask');
+    rectMaskToolBtn.classList.toggle('active', mode === 'rectMask');
 }
 
 // History management functions
@@ -191,5 +241,7 @@ dropArea.addEventListener('drop', (e) => {
 
 // Make drop area clickable to open file explorer
 dropArea.addEventListener('click', () => {
-    imageUpload.click();
+    if (!dropArea.classList.contains('hidden')) {
+        imageUpload.click();
+    }
 });
