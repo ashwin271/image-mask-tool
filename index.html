@@ -14,10 +14,7 @@
 
     <main>
         <div class="controls">
-            <div class="file-input-wrapper">
-                <input type="file" id="imageUpload" accept="image/*">
-                <i class="fas fa-cloud-upload-alt"></i> Choose an Image
-            </div>
+            <!-- Removed the file input wrapper -->
             <div class="slider-container">
                 <label for="toolSize">Tool Size:</label>
                 <input type="range" id="toolSize" min="1" max="100" value="10">
@@ -30,9 +27,11 @@
                 <div id="dropArea" class="drop-area">
                     <i class="fas fa-cloud-upload-alt"></i>
                     <p>Drop image here or click to upload</p>
+                    <input type="file" id="imageUpload" class="hidden">
                 </div>
                 <canvas id="canvas"></canvas>
                 <canvas id="maskCanvas" class="hidden"></canvas>
+                <button id="clearImage" class="hidden"><i class="fas fa-times"></i></button>
             </div>
 
             <div class="toolbar">
@@ -58,6 +57,8 @@
             <button id="exportMask"><i class="fas fa-download"></i> Export Mask</button>
             <button id="clearMask"><i class="fas fa-trash-alt"></i> Clear Mask</button>
         </div>
+
+        <!-- Removed the mask table wrapper -->
     </main>
 
     <script src="script.js"></script>
